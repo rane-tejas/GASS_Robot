@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from collections import namedtuple
+from dataclasses import dataclass
 
 import Adafruit_PCA9685
 from adafruit_servokit import ServoKit
@@ -18,8 +19,8 @@ class motor:
 class limb:
     leg_pin: int
     patch_pin: int
-    leg_motor: motor(180, 100, 2)
-    patch_motor: motor(307, 60, 0.25)
+    leg_motor: motor = motor(180, 100, 2)
+    patch_motor: motor = motor(307, 60, 0.25)
 
 class Utils():
     """ 
