@@ -15,12 +15,19 @@ class motor:
     step: float
     time: float
 
+# @dataclass
+# class limb:
+#     leg_pin: int
+#     patch_pin: int
+#     leg_motor: motor = motor(180, 100, 2)
+#     patch_motor: motor = motor(307, 60, 0.25)
+    
 @dataclass
 class limb:
     leg_pin: int
     patch_pin: int
-    leg_motor: motor = motor(180, 100, 2)
-    patch_motor: motor = motor(307, 60, 0.25)
+    leg_motor: motor = motor(100, 100, 2)
+    patch_motor: motor = motor(300, 60, 0.25)
 
 class Utils():
     """ 
@@ -37,7 +44,7 @@ class Utils():
         self.kit = ServoKit(channels=16)
 
     def toggle_patch(self, pin, direction, motor):
-        pwm_val = motor.stall + direction*motor.step
+        pwm_val = motor.stall - direction*motor.step
         self.pwm.set_pwm(pin, 0, pwm_val)
         time.sleep(motor.time)
         self.pwm.set_pwm(pin, 0, motor.stall)
@@ -126,6 +133,7 @@ class GASSController():
         """
 
         action = self.get_action()
+        print('Action ', action)
         
         for i in range(len(action)):
             if action[i] > 0:
@@ -157,3 +165,15 @@ if __name__ == "__main__":
 
     control = GASSController(limbs)
     control.run()
+    
+    ### Servo test ###
+#     utils = Utils()
+#     patch_motor = motor(300, 60, 0.25)
+#     leg_motor = motor(100, 100, 2)
+#     print('toggling one motor')
+#     utils.toggle_patch(pin=8, direction=-1, motor=patch_motor)
+#     utils.toggle_leg(pin=15, direction=-1, motor=leg_motor)
+#     time.sleep(1)
+#     utils.toggle_leg(pin=9, direction=-1, motor=leg_motor)
+#     utils.toggle_leg(pin=7, direction=-1, motor=leg_motor)
+    
