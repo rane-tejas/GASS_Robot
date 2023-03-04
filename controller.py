@@ -1,4 +1,5 @@
 import time
+import argparse
 import numpy as np
 from collections import namedtuple
 from dataclasses import dataclass
@@ -21,21 +22,21 @@ class motor:
 #     patch_pin: int
 #     leg_motor: motor = motor(180, 100, 2)
 #     patch_motor: motor = motor(307, 60, 0.25)
-    
+
 @dataclass
 class limb:
     leg_pin: int
     patch_pin: int
-    leg_motor: motor = motor(100, 100, 2)
-    patch_motor: motor = motor(300, 60, 0.25)
+    leg_motor: motor = motor(70, 70, 2)
+    patch_motor: motor = motor(307, 60, 0.45)
 
 class Utils():
-    """ 
+    """
     Level 1:
     All utilities related to the servo motors
     - servo moving commands
     - servo home command
-    - servo pin definitions 
+    - servo pin definitions
     """
 
     def __init__(self):
@@ -48,19 +49,22 @@ class Utils():
         self.pwm.set_pwm(pin, 0, pwm_val)
         time.sleep(motor.time)
         self.pwm.set_pwm(pin, 0, motor.stall)
-        time.sleep(1)
+        print("patch", pin)
+        time.sleep(motor.time)
 
     def toggle_leg(self, pin, direction, motor):
         motor_deg = motor.stall - (direction*motor.step)
         self.kit.servo[pin].set_pulse_width_range(500, 2500)
         self.kit.servo[pin].actuation_range = 270
+        print("motor deg", motor_deg, pin)
         self.kit.servo[pin].angle = motor_deg
         time.sleep(motor.time)
 
-    def home_leg(self, pin):
+    def home_leg(self, pin, motor):
         self.kit.servo[pin].set_pulse_width_range(500, 2500)
         self.kit.servo[pin].actuation_range = 270
-        self.kit.servo[pin].angle = 0
+        self.kit.servo[pin].angle = motor.stall + motor.step
+        print("home", pin)
         time.sleep(1)
 
 class Limb():
@@ -86,10 +90,10 @@ class Limb():
         self.utils.toggle_leg(self.limb.leg_pin, -1, self.limb.leg_motor)
 
     def limb_to_home(self):
-        self.utils.home_leg(self.limb.leg_pin)
+        self.utils.home_leg(self.limb.leg_pin, self.limb.leg_motor)
 
 class GASSController():
-    """ 
+    """
     Level 3:
     Robot controller functions
     - takes direction vector and publishes command to move
@@ -101,6 +105,7 @@ class GASSController():
         self.l = 1
         self.d_ang = 0.0
         self.angles = [0.0, 2*PI/5, 4*PI/5, 6*PI/5, 8*PI/5]
+        # self.angles = [-2*PI/5, 0.0, 2*PI/5, 4*PI/5, 6*PI/5]
 
     def toggle_patches(self, flag):
         for limb in self.limbs:
@@ -128,18 +133,18 @@ class GASSController():
         return action
 
     def run(self):
-        """ 
+        """
         This function runs the main controller loop per control step.
         """
 
         action = self.get_action()
         print('Action ', action)
-        
+
         for i in range(len(action)):
             if action[i] > 0:
                 self.limbs[i].extend_limb()
-            else:
-                self.limbs[i].contract_limb()
+#             else:
+#                 self.limbs[i].contract_limb()
 
         self.toggle_patches(1)
 
@@ -151,7 +156,16 @@ class GASSController():
 
         self.toggle_patches(0)
 
+        for i in range(len(action)):
+            self.limbs[i].limb_to_home()
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--zero', action='store_true', help='Zero all limb motors')
+    parser.add_argument('--home', action='store_true', help='Home all limb motors')
+
+    args = parser.parse_args()
+
     # Initialize Limb Objects
     L1 = Limb(limb(leg_pin=7, patch_pin=6))
     L2 = Limb(limb(leg_pin=9, patch_pin=8))
@@ -160,20 +174,76 @@ if __name__ == "__main__":
     L5 = Limb(limb(leg_pin=15, patch_pin=14))
 
     limbs = [L1, L2, L3, L4, L5]
-    # robot = namedtuple('robot', 'limb1, limb2, limb3, limb4, limb5')
-    # GASS = robot(L1, L2, L3, L4, L5)
+    robot = namedtuple('robot', 'limb1, limb2, limb3, limb4, limb5')
+    GASS = robot(L1, L2, L3, L4, L5)
 
-    control = GASSController(limbs)
-    control.run()
-    
+    ### Setting Leg Motor zeroes ###
+    if args.zero:
+        utils = Utils()
+        utils.kit.servo[7].angle=0
+        time.sleep(1)
+        utils.kit.servo[9].angle=0
+        time.sleep(1)
+        utils.kit.servo[11].angle=0
+        time.sleep(1)
+        utils.kit.servo[13].angle=0
+        time.sleep(1)
+        utils.kit.servo[15].angle=0
+        time.sleep(1)
+
+    ### Setting Leg Motor home ###
+    elif args.home:
+        utils = Utils()
+        utils.kit.servo[7].actuation_range = 270
+        utils.kit.servo[7].angle=200
+        time.sleep(1)
+        utils.kit.servo[9].actuation_range = 270
+        utils.kit.servo[9].angle=200
+        time.sleep(1)
+        utils.kit.servo[11].actuation_range = 270
+        utils.kit.servo[11].angle=200
+        time.sleep(1)
+        utils.kit.servo[13].actuation_range = 270
+        utils.kit.servo[13].angle=200
+        time.sleep(1)
+        utils.kit.servo[15].actuation_range = 270
+        utils.kit.servo[15].angle=200
+        time.sleep(1)
+
+    else:
+        control = GASSController(limbs)
+        control.run()
+
     ### Servo test ###
 #     utils = Utils()
-#     patch_motor = motor(300, 60, 0.25)
-#     leg_motor = motor(100, 100, 2)
+#     patch_motor = motor(300, 150, 0.2)
+#     leg_motor = motor(125, 125, 2)
 #     print('toggling one motor')
-#     utils.toggle_patch(pin=8, direction=-1, motor=patch_motor)
-#     utils.toggle_leg(pin=15, direction=-1, motor=leg_motor)
-#     time.sleep(1)
-#     utils.toggle_leg(pin=9, direction=-1, motor=leg_motor)
+#     utils.kit.servo[7].set_pulse_width_range(500, 2500)
+#     utils.kit.servo[7].actuation_range = 270
 #     utils.toggle_leg(pin=7, direction=-1, motor=leg_motor)
-    
+# #     utils.toggle_leg(pin=15, direction=-1, motor=leg_motor)
+#     utils.kit.servo[15].angle=180
+#     time.sleep(5)
+#     utils.kit.servo[15].angle=0
+# #     utils.toggle_leg(pin=7, direction=1, motor=leg_motor)
+#     time.sleep(5)
+#     utils.kit.servo[15].angle=180
+#     utils.toggle_leg(pin=7, direction=-1, motor=leg_motor)
+
+    ### Setting patch motor zeroes ###
+#     utils.toggle_patch(pin=6, direction=1, motor=patch_motor)
+#     utils.toggle_patch(pin=8, direction=1, motor=patch_motor)
+#     utils.toggle_patch(pin=10, direction=1, motor=patch_motor)
+#     utils.toggle_patch(pin=12, direction=1, motor=patch_motor)
+#     utils.toggle_patch(pin=14, direction=1, motor=patch_motor)
+#     utils.toggle_patch(pin=6, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=8, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=10, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=12, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=14, direction=-1, motor=patch_motor)
+
+#     utils.toggle_patch(pin=8, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=10, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=12, direction=-1, motor=patch_motor)
+#     utils.toggle_patch(pin=14, direction=-1, motor=patch_motor)
