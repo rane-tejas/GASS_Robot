@@ -16,13 +16,6 @@ class motor:
     step: float
     time: float
 
-# @dataclass
-# class limb:
-#     leg_pin: int
-#     patch_pin: int
-#     leg_motor: motor = motor(180, 100, 2)
-#     patch_motor: motor = motor(307, 60, 0.25)
-
 @dataclass
 class limb:
     leg_pin: int
@@ -104,8 +97,9 @@ class GASSController():
         self.limbs = limbs
         self.l = 1
         self.d_ang = 0.0
-        self.angles = [0.0, 2*PI/5, 4*PI/5, 6*PI/5, 8*PI/5]
-        # self.angles = [-2*PI/5, 0.0, 2*PI/5, 4*PI/5, 6*PI/5]
+        self.angles = [-2*PI/5, 0.0, 2*PI/5, 4*PI/5, 6*PI/5]
+        self.neg_action_idx = None
+        self.neg_action_flag = False
 
     def toggle_patches(self, flag):
         for limb in self.limbs:
@@ -127,8 +121,11 @@ class GASSController():
         action = []
         self.get_direction()
 
-        for ang in self.angles:
+        for i, ang in enumerate(self.angles):
             act = self.l * np.cos(self.d_ang-ang)
+            if not self.neg_action_flag and act < 0:
+                self.neg_action_idx = i - 1
+                self.neg_action_flag = True
             action.append(act)
         return action
 
@@ -140,24 +137,33 @@ class GASSController():
         action = self.get_action()
         print('Action ', action)
 
-        for i in range(len(action)):
-            if action[i] > 0:
+        for i, act in enumerate(action[self.neg_action_idx:] + action[:self.neg_action_idx]):
+            if act < 0:
+                self.limbs[i].engage_gecko()
+            elif act > 0:
                 self.limbs[i].extend_limb()
-#             else:
-#                 self.limbs[i].contract_limb()
 
-        self.toggle_patches(1)
+        for i, act in enumerate(action[self.neg_action_idx:] + action[:self.neg_action_idx]):
+            if act < 0:
+                self.limbs[i].extend_limb()
+            elif act > 0:
+                self.limbs[i].engage_gecko()
 
-        for i in range(len(action)):
-            if action[i] > 0:
+        for i, act in enumerate(action[self.neg_action_idx:] + action[:self.neg_action_idx]):
+            if act < 0:
+                self.limbs[i].disengage_gecko()
+            elif act > 0:
                 self.limbs[i].contract_limb()
-            else:
-                self.limbs[i].extend_limb()
 
-        self.toggle_patches(0)
+        for i, act in enumerate(action[self.neg_action_idx:] + action[:self.neg_action_idx]):
+            if act < 0:
+                self.limbs[i].contract_limb()
+            elif act > 0:
+                self.limbs[i].disengage_gecko()
 
-        for i in range(len(action)):
-            self.limbs[i].limb_to_home()
+        self.neg_action_idx = None
+        self.neg_action_flag = False
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
